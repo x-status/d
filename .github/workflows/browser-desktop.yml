@@ -1,0 +1,96 @@
+name: browser-desktop
+
+# ブラウザから操作できる軽量デスクトップを GitHub Actions 上に立てる。
+# 構成: Xvfb (プリインストール) + fluxbox + x11vnc + noVNC + Cloudflare Quick Tunnel
+# 事前準備: リポジトリの Secrets に VNC_PASSWORD を登録しておくこと。
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "セッションを維持する分数"
+        default: "60"
+      resolution:
+        description: "画面解像度"
+        default: "1600x900x24"
+
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360   # GitHub の 1 ジョブ上限は 6 時間
+    env:
+      DISPLAY: ":99"
+
+    steps:
+      # --- 1) パッケージ導入（約20〜40秒） ---------------------------------
+      # xvfb はランナーイメージにプリインストール済みなので入れない。
+      # --no-install-recommends が効くのでフォント・アイコン類を巻き込まない。
+      - name: Install minimal desktop stack
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            fluxbox x11vnc novnc websockify xterm
+
+      # --- 2) X サーバ・WM・VNC・noVNC を起動（数秒） ----------------------
+      - name: Start Xvfb + fluxbox + x11vnc + noVNC
+        run: |
+          Xvfb :99 -screen 0 "${{ inputs.resolution }}" -nolisten tcp &
+          # X の起動待ち（ソケットが出来るまで最大 6 秒）
+          for _ in $(seq 60); do
+            [ -S /tmp/.X11-unix/X99 ] && break
+            sleep 0.1
+          done
+
+          fluxbox > /tmp/fluxbox.log 2>&1 &
+          xterm &   # 動作確認用。不要なら消す
+
+          x11vnc -display :99 -rfbport 5900 \
+                 -passwd "${{ secrets.VNC_PASSWORD }}" \
+                 -forever -shared -noxdamage -ncache 10 \
+                 -bg -o /tmp/x11vnc.log
+
+          websockify -D --web=/usr/share/novnc/ 6080 localhost:5900
+
+      # --- 3) 外部からアクセスするためのトンネル（約5〜10秒） --------------
+      # ランナーはポートを外に開けないので Cloudflare Quick Tunnel を使う。
+      # アカウント不要で *.trycloudflare.com の URL が払い出される。
+      - name: Expose via Cloudflare Quick Tunnel
+        run: |
+          curl -sSLo /tmp/cloudflared \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x /tmp/cloudflared
+          /tmp/cloudflared tunnel --no-autoupdate --url http://localhost:6080 \
+            > /tmp/cf.log 2>&1 &
+
+          URL=""
+          for _ in $(seq 60); do
+            URL=$(grep -om1 'https://[a-z0-9-]*\.trycloudflare\.com' /tmp/cf.log || true)
+            [ -n "$URL" ] && break
+            sleep 1
+          done
+
+          if [ -z "$URL" ]; then
+            echo "トンネルURLの取得に失敗"; cat /tmp/cf.log; exit 1
+          fi
+          echo "::notice title=Desktop URL::${URL}/vnc.html"
+          echo "### [デスクトップを開く](${URL}/vnc.html)" >> "$GITHUB_STEP_SUMMARY"
+
+      # --- 4) セッション維持 ----------------------------------------------
+      - name: Keep alive
+        run: sleep $(( ${{ inputs.minutes }} * 60 ))
+
+
+# =====================================================================
+# さらに速くしたい場合（起動〜10〜20秒）のパターン:
+#
+#   1) 上記スタックを焼き込んだイメージを一度 GHCR に push しておく
+#   2) ワークフローでは pull して走らせるだけにする
+#
+#   - name: Run prebuilt desktop image
+#     run: |
+#       docker run -d --name desktop -p 6080:6080 \
+#         ghcr.io/<owner>/<image>:latest
+#
+# apt の解決・展開が丸ごと消えるので、GHCR からの pull（同一ネットワーク、
+# 数百MB でも十数秒）だけで済む。定期的に回すなら断然こちらが速い。
+# =====================================================================
