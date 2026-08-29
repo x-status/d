@@ -1,0 +1,39 @@
+name: Run Webtop (Browser Desktop)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  webtop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Cloudflared
+        run: |
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
+
+      - name: Start Webtop Container
+        run: |
+          # 最軽量クラスの alpine-xfce イメージを使用 (HTTPポート: 3000, HTTPSポート: 3001)
+          docker run -d \
+            --name=webtop \
+            --security-opt seccomp=unconfined \
+            -e PUID=1000 \
+            -e PGID=1000 \
+            -e TZ=Asia/Tokyo \
+            -p 3000:3000 \
+            --shm-size="1gb" \
+            --restart unless-stopped \
+            lscr.io/linuxserver/webtop:alpine-xfce
+
+          # コンテナの初期化待機
+          echo "Waiting for container to be ready..."
+          sleep 10
+
+      - name: Start Cloudflare Tunnel
+        run: |
+          echo "=========================================================="
+          echo "以下のログに出力される *.trycloudflare.com にアクセスしてください"
+          echo "=========================================================="
+          # 3000番ポート（WebtopのWebUI）を外部公開
+          cloudflared tunnel --url http://localhost:3000
