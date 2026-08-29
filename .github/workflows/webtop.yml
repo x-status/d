@@ -25,7 +25,7 @@ jobs:
               -p 3001:3001 \
               --shm-size="1gb" \
               --restart unless-stopped \
-              lscr.io/linuxserver/webtop:latest
+              ghcr.io/linuxserver/webtop:latest
 
         - name: Start Cloudflared
           run: |
