@@ -24,17 +24,17 @@ jobs:
               --restart unless-stopped \
               lscr.io/linuxserver/webtop:latest
 
-        - name: Show desktop url
-          run: |
-            until url=$(grep -Pom1 'https://[\w-]+.trycloudflare.com' cf.log 2>/dev/null); do
-              sleep 1
-            done
-            echo "[Open Desktop1]($url)" >> "$GITHUB_STEP_SUMMARY"
-            echo "Open Desktop2: $url"
-            echo "::notice title=Open Desktop3::$url"
-
-        - name: Install Cloudflared
+        - name: Start Cloudflared
           run: |
             wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
             sudo dpkg -i cloudflared-linux-amd64.deb
-            cloudflared tunnel --url http://localhost:3000 --logfile cf.log
+            nohup cloudflared tunnel --url http://localhost:3000 >cf.log 2>&1 &
+
+      - name: Show desktop url
+        run: |
+          until url=$(grep -Pom1 'https://[\w-]+.trycloudflare.com' cf.log 2>/dev/null); do
+            sleep 1
+          done
+          echo "[Open Desktop1]($url)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Open Desktop2: $url"
+          echo "::notice title=Open Desktop3::$url"
