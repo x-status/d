@@ -22,14 +22,16 @@ jobs:
               -p 3001:3001 \
               --shm-size="1gb" \
               --restart unless-stopped \
-              ghcr.io/linuxserver/webtop:latest
+              lscr.io/linuxserver/webtop:latest
 
         - name: Show desktop url
           run: |
-            until url=$(grep -Pom1 'https://[\w-]+.trycloudflare.com' cf.log); do
+            until url=$(grep -Pom1 'https://[\w-]+.trycloudflare.com' cf.log 2>/dev/null); do
               sleep 1
             done
-            echo "[Open Desktop]($url)" >> "$GITHUB_STEP_SUMMARY"
+            echo "[Open Desktop1]($url)" >> "$GITHUB_STEP_SUMMARY"
+            echo "Open Desktop2: $url"
+            echo "::notice title=Open Desktop3::$url"
 
         - name: Install Cloudflared
           run: |
