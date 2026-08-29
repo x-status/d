@@ -26,7 +26,7 @@ jobs:
             -p 3001:3001 \
             --shm-size="1gb" \
             --restart unless-stopped \
-            lscr.io/linuxserver/webtop:latest
+            ghcr.io/linuxserver/webtop:latest
 
           echo "Waiting for container to be ready..."
           sleep 10
