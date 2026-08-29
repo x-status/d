@@ -1,0 +1,176 @@
+name: Browser desktop
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: Session duration in minutes
+        required: true
+        default: 60
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 130
+
+    env:
+      SESSION_MINUTES: ${{ inputs.minutes }}
+
+    steps:
+      - name: Start browser desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if (( SESSION_MINUTES < 1 || SESSION_MINUTES > 120 )); then
+            echo "::error::minutes must be between 1 and 120"
+            exit 1
+          fi
+
+          # Update APT and download KasmVNC/cloudflared in parallel.
+          sudo apt-get update -qq &
+          apt_pid=$!
+
+          curl -fsSL --retry 3 \
+            -o /tmp/kasmvnc.deb \
+            https://github.com/kasmtech/KasmVNC/releases/download/v1.5.0/kasmvncserver_noble_1.5.0_amd64.deb &
+          kasm_download_pid=$!
+
+          curl -fsSL --retry 3 \
+            -o /tmp/cloudflared \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.8.2/cloudflared-linux-amd64 &
+          cloudflared_download_pid=$!
+
+          wait "${apt_pid}"
+          wait "${kasm_download_pid}"
+          wait "${cloudflared_download_pid}"
+
+          printf '%s  %s\n' \
+            'fcfb02b575a52ca1af2e3267af4e1517bcdeb30ac48c834c69abaed3c0576ad2' \
+            '/tmp/cloudflared' |
+            sha256sum -c -
+
+          sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared
+
+          sudo env DEBIAN_FRONTEND=noninteractive \
+            apt-get install -y --no-install-recommends \
+            openbox /tmp/kasmvnc.deb
+
+          runtime_dir="/tmp/runtime-${UID}"
+          mkdir -p "${runtime_dir}"
+          chmod 700 "${runtime_dir}"
+
+          # Start KasmVNC directly so no password setup prompt is shown.
+          nohup /usr/bin/Xvnc :1 \
+            -geometry 1440x900 \
+            -depth 24 \
+            -interface 127.0.0.1 \
+            -websocketPort 6080 \
+            -httpd /usr/share/kasmvnc/www \
+            -rfbport -1 \
+            -sslOnly 0 \
+            -disableBasicAuth \
+            -SecurityTypes None \
+            -AlwaysShared \
+            -FreeKeyMappings \
+            -FrameRate 24 \
+            </dev/null >/tmp/kasmvnc.log 2>&1 &
+          kasm_pid=$!
+
+          kasm_ready=false
+
+          for _ in $(seq 1 50); do
+            if curl -fsS http://127.0.0.1:6080/ >/dev/null; then
+              kasm_ready=true
+              break
+            fi
+
+            if ! kill -0 "${kasm_pid}" 2>/dev/null; then
+              break
+            fi
+
+            sleep 0.2
+          done
+
+          if [[ "${kasm_ready}" != true ]]; then
+            sed -n '1,160p' /tmp/kasmvnc.log
+            exit 1
+          fi
+
+          nohup env \
+            DISPLAY=:1 \
+            XDG_RUNTIME_DIR="${runtime_dir}" \
+            openbox --sm-disable \
+            </dev/null >/tmp/openbox.log 2>&1 &
+
+          sleep 0.5
+
+          nohup env \
+            DISPLAY=:1 \
+            XDG_RUNTIME_DIR="${runtime_dir}" \
+            google-chrome \
+            --user-data-dir=/tmp/chrome-profile \
+            --password-store=basic \
+            --no-first-run \
+            --no-default-browser-check \
+            --disable-dev-shm-usage \
+            --disable-session-crashed-bubble \
+            --window-size=1440,900 \
+            --start-maximized \
+            about:blank \
+            </dev/null >/tmp/chrome.log 2>&1 &
+
+          nohup cloudflared tunnel \
+            --no-autoupdate \
+            --url http://127.0.0.1:6080 \
+            </dev/null >/tmp/cloudflared.log 2>&1 &
+
+          desktop_url=""
+
+          for _ in $(seq 1 40); do
+            desktop_url="$(
+              grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' \
+                /tmp/cloudflared.log |
+                head -n 1 || true
+            )"
+
+            [[ -n "${desktop_url}" ]] && break
+            sleep 1
+          done
+
+          if [[ -z "${desktop_url}" ]]; then
+            sed -n '1,160p' /tmp/cloudflared.log
+            exit 1
+          fi
+
+          {
+            printf '## Browser desktop\n\n'
+            printf '[Open desktop](%s)\n' "${desktop_url}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          echo "::notice title=Browser desktop::${desktop_url}"
+
+      - name: Keep session alive
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          deadline=$((SECONDS + SESSION_MINUTES * 60))
+
+          while (( SECONDS < deadline )); do
+            if ! pgrep -x Xvnc >/dev/null; then
+              echo "::error::KasmVNC stopped unexpectedly"
+              exit 1
+            fi
+
+            if ! pgrep -x cloudflared >/dev/null; then
+              echo "::error::Cloudflare Tunnel stopped unexpectedly"
+              exit 1
+            fi
+
+            sleep 15
+          done
