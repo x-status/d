@@ -6,6 +6,9 @@ on:
 jobs:
   webtop:
     runs-on: ubuntu-latest
+    environment:
+      name: webtop
+      url: ${{ steps.desktop_url.outputs.url }}
     steps:
       - parallel:
         - name: Start Webtop Container
@@ -30,11 +33,16 @@ jobs:
             sudo dpkg -i cloudflared-linux-amd64.deb
             nohup cloudflared tunnel --url http://localhost:3000 >cf.log 2>&1 &
 
-      - name: Show desktop url
+      - name: Get Desktop URL
+        id: desktop_url
         run: |
           until url=$(grep -Pom1 'https://[\w-]+.trycloudflare.com' cf.log 2>/dev/null); do
             sleep 1
           done
+          echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "[Open Desktop1]($url)" >> "$GITHUB_STEP_SUMMARY"
           echo "Open Desktop2: $url"
           echo "::notice title=Open Desktop3::$url"
+
+      - name: Sleep
+        run: sleep 180
