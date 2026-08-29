@@ -14,19 +14,20 @@ jobs:
 
       - name: Start Webtop Container
         run: |
-          # 最軽量クラスの alpine-xfce イメージを使用 (HTTPポート: 3000, HTTPSポート: 3001)
           docker run -d \
             --name=webtop \
             --security-opt seccomp=unconfined \
             -e PUID=1000 \
             -e PGID=1000 \
             -e TZ=Asia/Tokyo \
+            -e CUSTOM_RES=1920x1080 \
+            -e AUDIO_SUPPORT=true \
             -p 3000:3000 \
+            -p 3001:3001 \
             --shm-size="1gb" \
             --restart unless-stopped \
-            lscr.io/linuxserver/webtop:alpine-xfce
+            lscr.io/linuxserver/webtop:latest
 
-          # コンテナの初期化待機
           echo "Waiting for container to be ready..."
           sleep 10
 
@@ -35,5 +36,4 @@ jobs:
           echo "=========================================================="
           echo "以下のログに出力される *.trycloudflare.com にアクセスしてください"
           echo "=========================================================="
-          # 3000番ポート（WebtopのWebUI）を外部公開
           cloudflared tunnel --url http://localhost:3000
