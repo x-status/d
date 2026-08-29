@@ -11,18 +11,12 @@ jobs:
         - name: Start Webtop Container
           run: |
             docker run -d \
-              --name=webtop \
               --security-opt seccomp=unconfined \
-              -e PUID=1000 \
-              -e PGID=1000 \
-              -e TZ=Asia/Tokyo \
-              -e CUSTOM_RES=1920x1080 \
-              -e AUDIO_SUPPORT=true \
               -p 3000:3000 \
               -p 3001:3001 \
-              --shm-size="1gb" \
+              --shm-size=1gb \
               --restart unless-stopped \
-              ghcr.io/linuxserver/webtop:latest
+              ghcr.io/linuxserver/webtop
 
         - name: Desktop URL https://<random-subdomain>.trycloudflare.com
           run: |
