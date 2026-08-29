@@ -24,8 +24,15 @@ jobs:
               --restart unless-stopped \
               ghcr.io/linuxserver/webtop:latest
 
+        - name: Show desktop url
+          run: |
+            until url=$(grep -Pom1 'https://[\w-]+.trycloudflare.com' cf.log); do
+              sleep 1
+            done
+            echo "[Open Desktop]($url)" >> "$GITHUB_STEP_SUMMARY"
+
         - name: Install Cloudflared
           run: |
             wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
             sudo dpkg -i cloudflared-linux-amd64.deb
-            cloudflared tunnel --url http://localhost:3000
+            cloudflared tunnel --url http://localhost:3000 --logfile cf.log
