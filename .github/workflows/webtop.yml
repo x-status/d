@@ -1,10 +1,8 @@
-name: Run Webtop (Browser Desktop)
-
 on:
   workflow_dispatch:
 
 jobs:
-  webtop:
+  desktop:
     runs-on: ubuntu-latest
     steps:
       - parallel:
