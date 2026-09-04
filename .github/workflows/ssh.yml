@@ -7,11 +7,5 @@ jobs:
   desktop:
     runs-on: ubuntu-latest
     steps:
-      - name: ssh <random-session>@uptermd.upterm.dev
-        background: true
-        uses: owenthereal/action-upterm@v1
-        with:
-          detached: true
-
-      - name: Desktop URL https://<random-subdomain>.trycloudflare.com / Stop with curl x or x/ in Address Bar
-        run: sleep 3600
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
