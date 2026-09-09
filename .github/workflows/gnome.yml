@@ -75,10 +75,9 @@ jobs:
 
           gnome_pid=""
           selkies_pid=""
-          tunnel_pid=""
           Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp > "$RUNNER_TEMP/xvfb.log" 2>&1 &
           xvfb_pid=$!
-          trap 'kill "$xvfb_pid" "$gnome_pid" "$selkies_pid" "$tunnel_pid" 2>/dev/null || true' EXIT
+          trap 'kill "$xvfb_pid" "$gnome_pid" "$selkies_pid" 2>/dev/null || true' EXIT
 
           nohup env DISPLAY=:99 \
             XDG_CURRENT_DESKTOP=GNOME \
@@ -97,31 +96,10 @@ jobs:
               --enable-basic-auth=false > "$RUNNER_TEMP/selkies.log" 2>&1 &
           selkies_pid=$!
 
-          for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:8080/ >/dev/null; then
-              break
-            fi
-            sleep 2
-          done
-          curl --fail --silent http://127.0.0.1:8080/ >/dev/null
-
-          cloudflared tunnel --url http://localhost:8080 2>&1 | tee "$RUNNER_TEMP/cloudflared.log" &
-          tunnel_pid=$!
-          for attempt in {1..30}; do
-            tunnel_url="$(grep -oE 'https://[^ ]+\.trycloudflare\.com' "$RUNNER_TEMP/cloudflared.log" | head -n 1 || true)"
-            if [[ -n "$tunnel_url" ]]; then
-              echo "Selkies URL: $tunnel_url"
-              break
-            fi
-            sleep 2
-          done
-          [[ -n "${tunnel_url:-}" ]]
-          for attempt in {1..30}; do
-            if curl --fail --silent --show-error "$tunnel_url/" >/dev/null; then
-              break
-            fi
-            sleep 2
-          done
-          curl --fail --silent --show-error "$tunnel_url/" >/dev/null
-          echo "GNOME Shell, Selkies, and the Cloudflare Tunnel are running."
-          wait "$tunnel_pid"
+      - name: Desktop URL https://<random-subdomain>.trycloudflare.com / Stop with curl x or x/ in Address Bar
+        run: |
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1
+          echo "<?php passthru('pkill cloudflared');" > index.php
+          sudo nohup php -S 0.0.0.0:80 2>/dev/null &
+          cloudflared tunnel --url http://localhost:8080
