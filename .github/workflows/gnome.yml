@@ -116,6 +116,12 @@ jobs:
             sleep 2
           done
           [[ -n "${tunnel_url:-}" ]]
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error "$tunnel_url/" >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
           curl --fail --silent --show-error "$tunnel_url/" >/dev/null
           echo "GNOME Shell, Selkies, and the Cloudflare Tunnel are running."
           wait "$tunnel_pid"
