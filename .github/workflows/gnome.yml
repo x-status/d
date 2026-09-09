@@ -15,11 +15,15 @@ jobs:
             sudo apt-get update
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
               dbus-x11 \
+              fonts-noto-cjk \
               gnome-shell \
               gnome-terminal \
+              libpulse0 \
               libva-drm2 \
               libva-wayland2 \
               libva-x11-2 \
+              pulseaudio \
+              pulseaudio-utils \
               xvfb
   
         - name: Install Selkies from source
@@ -41,6 +45,8 @@ jobs:
           cd "$RUNNER_TEMP/selkies"
 
           Xvfb :99 -screen 0 1920x1080x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+
+          pulseaudio --start --exit-idle-time=-1
 
           nohup env DISPLAY=:99 \
             XDG_CURRENT_DESKTOP=GNOME \
