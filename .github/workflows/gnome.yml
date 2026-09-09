@@ -10,7 +10,6 @@ jobs:
 
     steps:
       - name: Install GNOME and virtual display dependencies
-        shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -24,7 +23,6 @@ jobs:
             xvfb
 
       - name: Install Selkies from source
-        shell: bash
         run: |
           set -euo pipefail
           git clone https://github.com/selkies-project/selkies.git "$RUNNER_TEMP/selkies"
@@ -65,7 +63,6 @@ jobs:
           .venv/bin/python -m pip install -e .
 
       - name: Start GNOME, Selkies, and Cloudflare Tunnel
-        shell: bash
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/selkies"
@@ -95,11 +92,9 @@ jobs:
               --port 8080 \
               --enable-basic-auth=false > "$RUNNER_TEMP/selkies.log" 2>&1 &
           selkies_pid=$!
-
-      - name: Desktop URL https://<random-subdomain>.trycloudflare.com / Stop with curl x or x/ in Address Bar
-        run: |
           wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1
           echo "<?php passthru('pkill cloudflared');" > index.php
           sudo nohup php -S 0.0.0.0:80 2>/dev/null &
           cloudflared tunnel --url http://localhost:8080
+
