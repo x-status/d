@@ -65,7 +65,13 @@ jobs:
         run: |
           wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1
-          DISPLAY=:99 gsettings set org.gnome.desktop.background picture-uri "file:///usr/share/backgrounds/ubuntu-wallpaper-d.png"
+          sed -i 's/^Prompt=.*$/Prompt=never/' /etc/update-manager/release-upgrades
+          gsettings set org.gnome.desktop.background picture-uri 'file:///usr/share/backgrounds/ubuntu-wallpaper-d.png'
+          gsettings set org.gnome.desktop.lockdown disable-lock-screen true
+          gsettings set org.gnome.desktop.screensaver lock-enabled false
+          gsettings set org.gnome.desktop.screensaver idle-activation-enabled false
+          gsettings set org.gnome.desktop.session idle-delay 0
+          gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
           echo "<?php passthru('pkill cloudflared');" > index.php
           sudo nohup php -S 0.0.0.0:80 2>/dev/null &
           cloudflared tunnel --url http://localhost:8080
