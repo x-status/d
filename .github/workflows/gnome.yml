@@ -28,36 +28,9 @@ jobs:
           cd "$RUNNER_TEMP/selkies"
           python3 -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
-
-          wheel_dir="$RUNNER_TEMP/selkies-wheels"
-          mkdir -p "$wheel_dir"
-          python3 - "$wheel_dir" <<'PY'
-          import json
-          import pathlib
-          import sys
-          import urllib.request
-
-          output = pathlib.Path(sys.argv[1])
-          for project in ("pixelflux", "pcmflux"):
-              releases_url = f"https://api.github.com/repos/selkies-project/{project}/releases?per_page=20"
-              releases = json.load(urllib.request.urlopen(releases_url))
-              wheel = None
-              for release in releases:
-                  for asset in release["assets"]:
-                      name = asset["name"]
-                      if "cp312-cp312-manylinux" in name and "x86_64.whl" in name:
-                          wheel = asset["browser_download_url"]
-                          break
-                  if wheel:
-                      break
-              if not wheel:
-                  raise SystemExit(f"No compatible {project} wheel was found")
-              target = output / wheel.rsplit("/", 1)[-1]
-              print(f"Downloading {wheel}")
-              urllib.request.urlretrieve(wheel, target)
-          PY
-
-          .venv/bin/python -m pip install "$wheel_dir"/*.whl
+          .venv/bin/python -m pip install \
+            https://github.com/selkies-project/pixelflux/releases/download/f8cda2e/pixelflux-2.1.0-cp312-cp312-manylinux_2_28_x86_64.whl \
+            https://github.com/selkies-project/pcmflux/releases/download/a489f79/pcmflux-2.1.0-cp312-cp312-manylinux_2_28_x86_64.whl
           ./scripts/ci/build-web.sh
           .venv/bin/python -m pip install -e .
 
