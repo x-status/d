@@ -61,17 +61,19 @@ jobs:
             dbus-run-session -- "$PWD/.venv/bin/selkies" \
               --enable-basic-auth=false > "$RUNNER_TEMP/selkies.log" 2>&1 &
 
-      - name: Desktop URL https://<random-subdomain>.trycloudflare.com / Stop with curl x or x/ in Address Bar
-        run: |
-          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-          sudo dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1
           sudo sed -i 's/^Prompt=.*$/Prompt=never/' /etc/update-manager/release-upgrades
           gsettings set org.gnome.desktop.background picture-uri 'file:///usr/share/backgrounds/ubuntu-wallpaper-d.png'
+          gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/backgrounds/ubuntu-wallpaper-d.png'
           gsettings set org.gnome.desktop.lockdown disable-lock-screen true
           gsettings set org.gnome.desktop.screensaver lock-enabled false
           gsettings set org.gnome.desktop.screensaver idle-activation-enabled false
           gsettings set org.gnome.desktop.session idle-delay 0
           gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+
+      - name: Desktop URL https://<random-subdomain>.trycloudflare.com / Stop with curl x or x/ in Address Bar
+        run: |
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1
           echo "<?php passthru('pkill cloudflared');" > index.php
           sudo nohup php -S 0.0.0.0:80 2>/dev/null &
           cloudflared tunnel --url http://localhost:8080
