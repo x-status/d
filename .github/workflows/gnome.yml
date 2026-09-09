@@ -8,31 +8,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install GNOME and virtual display dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            dbus-x11 \
-            gnome-shell \
-            gnome-terminal \
-            libva-drm2 \
-            libva-wayland2 \
-            libva-x11-2 \
-            xvfb
-
-      - name: Install Selkies from source
-        run: |
-          set -euo pipefail
-          git clone https://github.com/selkies-project/selkies.git "$RUNNER_TEMP/selkies"
-          cd "$RUNNER_TEMP/selkies"
-          python3 -m venv .venv
-          .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/python -m pip install \
-            https://github.com/selkies-project/pixelflux/releases/download/f8cda2e/pixelflux-2.1.0-cp312-cp312-manylinux_2_28_x86_64.whl \
-            https://github.com/selkies-project/pcmflux/releases/download/a489f79/pcmflux-2.1.0-cp312-cp312-manylinux_2_28_x86_64.whl
-          ./scripts/ci/build-web.sh
-          .venv/bin/python -m pip install -e .
+      - parallel:
+        - name: Install GNOME and virtual display dependencies
+          run: |
+            set -euo pipefail
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+              dbus-x11 \
+              gnome-shell \
+              gnome-terminal \
+              libva-drm2 \
+              libva-wayland2 \
+              libva-x11-2 \
+              xvfb
+  
+        - name: Install Selkies from source
+          run: |
+            set -euo pipefail
+            git clone https://github.com/selkies-project/selkies.git "$RUNNER_TEMP/selkies"
+            cd "$RUNNER_TEMP/selkies"
+            python3 -m venv .venv
+            .venv/bin/python -m pip install --upgrade pip
+            .venv/bin/python -m pip install \
+              https://github.com/selkies-project/pixelflux/releases/download/f8cda2e/pixelflux-2.1.0-cp312-cp312-manylinux_2_28_x86_64.whl \
+              https://github.com/selkies-project/pcmflux/releases/download/a489f79/pcmflux-2.1.0-cp312-cp312-manylinux_2_28_x86_64.whl
+            ./scripts/ci/build-web.sh
+            .venv/bin/python -m pip install -e .
 
       - name: Start GNOME, Selkies, and Cloudflare Tunnel
         run: |
