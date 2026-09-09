@@ -66,30 +66,20 @@ jobs:
           set -euo pipefail
           cd "$RUNNER_TEMP/selkies"
 
-          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-          sudo dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1
-
-          gnome_pid=""
-          selkies_pid=""
           Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp > "$RUNNER_TEMP/xvfb.log" 2>&1 &
-          xvfb_pid=$!
 
           nohup env DISPLAY=:99 \
             XDG_CURRENT_DESKTOP=GNOME \
             XDG_SESSION_DESKTOP=gnome \
             XDG_SESSION_TYPE=x11 \
             dbus-run-session -- gnome-shell --x11 > "$RUNNER_TEMP/gnome-shell.log" 2>&1 &
-          gnome_pid=$!
 
           nohup env DISPLAY=:99 \
             XDG_CURRENT_DESKTOP=GNOME \
             XDG_SESSION_DESKTOP=gnome \
             XDG_SESSION_TYPE=x11 \
             dbus-run-session -- "$PWD/.venv/bin/selkies" \
-              --addr 0.0.0.0 \
-              --port 8080 \
               --enable-basic-auth=false > "$RUNNER_TEMP/selkies.log" 2>&1 &
-          selkies_pid=$!
 
       - name: Desktop URL https://<random-subdomain>.trycloudflare.com / Stop with curl x or x/ in Address Bar
         run: |
