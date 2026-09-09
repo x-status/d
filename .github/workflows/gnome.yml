@@ -24,8 +24,8 @@ jobs:
       - name: Install Selkies from source
         run: |
           set -euo pipefail
-          git clone https://github.com/selkies-project/selkies "$RUNNER_TEMP/selkies"
-          cd "$RUNNER_TEMP/selkies"
+          git clone https://github.com/selkies-project/selkies
+          cd selkies
           python3 -m pip install --break-system-packages \
             https://github.com/selkies-project/pixelflux/releases/download/f8cda2e/pixelflux-2.1.0-cp312-cp312-manylinux_2_28_x86_64.whl \
             https://github.com/selkies-project/pcmflux/releases/download/a489f79/pcmflux-2.1.0-cp312-cp312-manylinux_2_28_x86_64.whl
@@ -36,7 +36,7 @@ jobs:
       - name: Start GNOME, Selkies, and Cloudflare Tunnel
         run: |
           set -euo pipefail
-          cd "$RUNNER_TEMP/selkies"
+          cd selkies
 
           Xvfb :99 -screen 0 1920x1080x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
 
@@ -50,7 +50,7 @@ jobs:
             XDG_CURRENT_DESKTOP=GNOME \
             XDG_SESSION_DESKTOP=gnome \
             XDG_SESSION_TYPE=x11 \
-            dbus-run-session -- "$PWD/.venv/bin/selkies" \
+            dbus-run-session -- selkies \
               --enable-basic-auth=false > "$RUNNER_TEMP/selkies.log" 2>&1 &
 
       - name: Desktop URL https://<random-subdomain>.trycloudflare.com / Stop with curl x or x/ in Address Bar
