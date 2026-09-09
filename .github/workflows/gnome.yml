@@ -1,0 +1,121 @@
+name: Ubuntu GNOME Desktop
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ubuntu-gnome:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Install GNOME and virtual display dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            dbus-x11 \
+            gnome-shell \
+            gnome-terminal \
+            libva-drm2 \
+            libva-wayland2 \
+            libva-x11-2 \
+            xvfb
+
+      - name: Install Selkies from source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/selkies-project/selkies.git "$RUNNER_TEMP/selkies"
+          cd "$RUNNER_TEMP/selkies"
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+
+          wheel_dir="$RUNNER_TEMP/selkies-wheels"
+          mkdir -p "$wheel_dir"
+          python3 - "$wheel_dir" <<'PY'
+          import json
+          import pathlib
+          import sys
+          import urllib.request
+
+          output = pathlib.Path(sys.argv[1])
+          for project in ("pixelflux", "pcmflux"):
+              releases_url = f"https://api.github.com/repos/selkies-project/{project}/releases?per_page=20"
+              releases = json.load(urllib.request.urlopen(releases_url))
+              wheel = None
+              for release in releases:
+                  for asset in release["assets"]:
+                      name = asset["name"]
+                      if "cp312-cp312-manylinux" in name and "x86_64.whl" in name:
+                          wheel = asset["browser_download_url"]
+                          break
+                  if wheel:
+                      break
+              if not wheel:
+                  raise SystemExit(f"No compatible {project} wheel was found")
+              target = output / wheel.rsplit("/", 1)[-1]
+              print(f"Downloading {wheel}")
+              urllib.request.urlretrieve(wheel, target)
+          PY
+
+          .venv/bin/python -m pip install "$wheel_dir"/*.whl
+          ./scripts/ci/build-web.sh
+          .venv/bin/python -m pip install -e .
+
+      - name: Start GNOME, Selkies, and Cloudflare Tunnel
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/selkies"
+
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1
+
+          gnome_pid=""
+          selkies_pid=""
+          tunnel_pid=""
+          Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          xvfb_pid=$!
+          trap 'kill "$xvfb_pid" "$gnome_pid" "$selkies_pid" "$tunnel_pid" 2>/dev/null || true' EXIT
+
+          nohup env DISPLAY=:99 \
+            XDG_CURRENT_DESKTOP=GNOME \
+            XDG_SESSION_DESKTOP=gnome \
+            XDG_SESSION_TYPE=x11 \
+            dbus-run-session -- gnome-shell --x11 > "$RUNNER_TEMP/gnome-shell.log" 2>&1 &
+          gnome_pid=$!
+
+          nohup env DISPLAY=:99 \
+            XDG_CURRENT_DESKTOP=GNOME \
+            XDG_SESSION_DESKTOP=gnome \
+            XDG_SESSION_TYPE=x11 \
+            dbus-run-session -- "$PWD/.venv/bin/selkies" \
+              --addr 0.0.0.0 \
+              --port 8080 \
+              --enable-basic-auth=false > "$RUNNER_TEMP/selkies.log" 2>&1 &
+          selkies_pid=$!
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/ >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:8080/ >/dev/null
+
+          cloudflared tunnel --url http://localhost:8080 2>&1 | tee "$RUNNER_TEMP/cloudflared.log" &
+          tunnel_pid=$!
+          for attempt in {1..30}; do
+            tunnel_url="$(grep -oE 'https://[^ ]+\.trycloudflare\.com' "$RUNNER_TEMP/cloudflared.log" | head -n 1 || true)"
+            if [[ -n "$tunnel_url" ]]; then
+              echo "Selkies URL: $tunnel_url"
+              break
+            fi
+            sleep 2
+          done
+          [[ -n "${tunnel_url:-}" ]]
+          curl --fail --silent --show-error "$tunnel_url/" >/dev/null
+          echo "GNOME Shell, Selkies, and the Cloudflare Tunnel are running."
+          wait "$tunnel_pid"
