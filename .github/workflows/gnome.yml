@@ -65,7 +65,7 @@ jobs:
         run: |
           wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1
-          sed -i 's/^Prompt=.*$/Prompt=never/' /etc/update-manager/release-upgrades
+          sudo sed -i 's/^Prompt=.*$/Prompt=never/' /etc/update-manager/release-upgrades
           gsettings set org.gnome.desktop.background picture-uri 'file:///usr/share/backgrounds/ubuntu-wallpaper-d.png'
           gsettings set org.gnome.desktop.lockdown disable-lock-screen true
           gsettings set org.gnome.desktop.screensaver lock-enabled false
